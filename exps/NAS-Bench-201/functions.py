@@ -2,6 +2,7 @@
 # Copyright (c) Xuanyi Dong [GitHub D-X-Y], 2019.08 #
 #####################################################
 import time, torch
+import os
 from procedures   import prepare_seed, get_optim_scheduler
 from utils        import get_model_infos, obtain_accuracy
 from config_utils import dict2config
@@ -72,7 +73,7 @@ def procedure(xloader, network, criterion, scheduler, optimizer, mode):
 
 
 
-def evaluate_for_seed(arch_config, config, arch, train_loader, valid_loaders, seed, logger):
+def evaluate_for_seed(arch_config, config, arch, train_loader, valid_loaders, seed, logger, index, dataset):
 
   prepare_seed(seed) # random seed
   net = get_cell_based_tiny_net(dict2config({'name': 'infer.tiny',
@@ -97,16 +98,30 @@ def evaluate_for_seed(arch_config, config, arch, train_loader, valid_loaders, se
 
     train_loss, train_acc1, train_acc5, train_tm = procedure(train_loader, network, criterion, scheduler, optimizer, 'train')
     train_losses[epoch] = train_loss
-    train_acc1es[epoch] = train_acc1 
+    train_acc1es[epoch] = train_acc1
     train_acc5es[epoch] = train_acc5
     train_times [epoch] = train_tm
     with torch.no_grad():
       for key, xloder in valid_loaders.items():
         valid_loss, valid_acc1, valid_acc5, valid_tm = procedure(xloder  , network, criterion,      None,      None, 'valid')
         valid_losses['{:}@{:}'.format(key,epoch)] = valid_loss
-        valid_acc1es['{:}@{:}'.format(key,epoch)] = valid_acc1 
+        valid_acc1es['{:}@{:}'.format(key,epoch)] = valid_acc1
         valid_acc5es['{:}@{:}'.format(key,epoch)] = valid_acc5
         valid_times ['{:}@{:}'.format(key,epoch)] = valid_tm
+
+        path = f'arch_{index}_dataset_{dataset}_seed_{seed}_epoch_{epoch}_valtop1_{valid_acc1}.tar'
+        torch.save({
+            'seed': seed,
+            'valtop1': valid_acc1,
+            'valtop5': valid_acc5,
+            'valloss': valid_loss,
+            'epoch': epoch,
+            'flop': flop,
+            'param': param,
+            'model': network.module.state_dict(),
+            'arch': index,
+            'dataset': dataset,
+        }, os.path.join('output/ckps', path))
 
     # measure elapsed time
     epoch_time.update(time.time() - start_time)
