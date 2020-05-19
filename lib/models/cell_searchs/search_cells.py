@@ -6,7 +6,7 @@ import warnings
 import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
-from ..cell_operations import OPS
+from lib.models.cell_operations import OPS
 
 
 # This module is used for NAS-Bench-201, represents a small search space with a complete DAG
@@ -120,6 +120,47 @@ class NAS201SearchCell(nn.Module):
       nodes.append( sum(inter_nodes) )
     return nodes[-1]
 
+  def extract_sub(self, op_indices):
+    edges = {}
+    for i in range(1, self.max_nodes):
+      for j in range(i):
+        node_str = '{:}<-{:}'.format(i, j)
+        edges[node_str] = deepcopy(self.edges[node_str][op_indices[node_str]])
+    edges = nn.ModuleDict(edges)
+    return SampledNAS201SearchCell(self.max_nodes, edges)
+
+
+class SampledNAS201SearchCell(nn.Module):
+  def __init__(self, max_nodes, edges):
+    super(SampledNAS201SearchCell, self).__init__()
+    self.max_nodes = max_nodes
+    self.edges = edges
+
+  def forward(self, input):
+    nodes = [input]
+    for i in range(1, self.max_nodes):
+      inter_nodes = []
+      for j in range(i):
+        node_str = '{:}<-{:}'.format(i, j)
+        inter_nodes.append(self.edges[node_str](nodes[j]))
+      nodes.append(sum(inter_nodes))
+    return nodes[-1]
+
+# # a dict length of 6, each is a integer range from 0 to 4
+# cell = NAS201SearchCell(10, 10, 1, 4, ['none', 'skip_connect', 'nor_conv_1x1', 'nor_conv_3x3', 'avg_pool_3x3'])
+#
+# op_indices={
+#   '1<-0': 0,
+#   '2<-0': 1,
+#   '2<-1': 1,
+#   '3<-0': 2,
+#   '3<-1': 3,
+#   '3<-2': 4,
+# }
+# # print(cell)
+#
+# sampled = cell.extract_sub(op_indices)
+# print(sampled)
 
 
 class MixedOp(nn.Module):

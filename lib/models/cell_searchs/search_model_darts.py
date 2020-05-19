@@ -6,9 +6,9 @@
 import torch
 import torch.nn as nn
 from copy import deepcopy
-from ..cell_operations import ResNetBasicblock
-from .search_cells     import NAS201SearchCell as SearchCell
-from .genotypes        import Structure
+from lib.models.cell_operations import ResNetBasicblock
+from lib.models.cell_searchs.search_cells     import NAS201SearchCell as SearchCell
+from lib.models.cell_searchs.genotypes        import Structure
 
 
 class TinyNetworkDarts(nn.Module):
@@ -95,3 +95,56 @@ class TinyNetworkDarts(nn.Module):
     logits = self.classifier(out)
 
     return out, logits
+
+  def extract_sub(self, op_indices):
+    stem = deepcopy(self.stem)
+    cells = nn.ModuleList()
+    for cell in self.cells:
+      if isinstance(cell, SearchCell):
+        cells.append(cell.extract_sub(op_indices))
+      else:
+        print(cell)
+        cells.append(deepcopy(cell))
+
+    lastact = deepcopy(self.lastact)
+    global_pooling = deepcopy(self.global_pooling)
+    classifier = deepcopy(self.classifier)
+    return SampledDarts(
+      stem, cells, lastact, global_pooling, classifier
+    )
+
+
+class SampledDarts(nn.Module):
+  def __init__(self, stem, cells, lastact, global_pooling, classifier):
+    super(SampledDarts, self).__init__()
+    self.stem = stem
+    self.cells = cells
+    self.lastact = lastact
+    self.global_pooling = global_pooling
+    self.classifier = classifier
+
+  def forward(self, inputs):
+    feature = self.stem(inputs)
+    for i, cell in enumerate(self.cells):
+        feature = cell(feature)
+
+    out = self.lastact(feature)
+    out = self.global_pooling( out )
+    out = out.view(out.size(0), -1)
+    logits = self.classifier(out)
+
+    return out, logits
+
+# op_indices={
+#   '1<-0': 0,
+#   '2<-0': 1,
+#   '2<-1': 1,
+#   '3<-0': 2,
+#   '3<-1': 3,
+#   '3<-2': 4,
+# }
+#
+# model = TinyNetworkDarts(16, 5, 4, 10, ['none', 'skip_connect', 'nor_conv_1x1', 'nor_conv_3x3', 'avg_pool_3x3'], False, True)
+#
+# sampled_darts = model.extract_sub(op_indices)
+# print(sampled_darts)

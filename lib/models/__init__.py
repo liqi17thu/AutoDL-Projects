@@ -11,7 +11,7 @@ __all__ = ['change_key', 'get_cell_based_tiny_net', 'get_search_spaces', 'get_ci
            ]
 
 # useful modules
-from config_utils import dict2config
+from lib.config_utils import dict2config
 from .SharedUtils import change_key
 from .cell_searchs import CellStructure, CellArchitectures
 
