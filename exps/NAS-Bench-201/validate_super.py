@@ -9,7 +9,7 @@ if str(lib_dir) not in sys.path: sys.path.insert(0, str(lib_dir))
 from config_utils import load_config
 from datasets     import get_datasets
 from log_utils    import Logger, AverageMeter, time_string, convert_secs2time
-from .functions import pure_evaluate
+from functions import pure_evaluate
 
 def get_op_list(n):
     ops = []
@@ -22,8 +22,8 @@ def getvalue(item, key):
     return item[:-4].split('_')[item[:-4].split('_').index(key)+1]
 
 def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
-    from lib.config_utils import dict2config
-    from lib.models import get_cell_based_tiny_net
+    from config_utils import dict2config
+    from models import get_cell_based_tiny_net
     logger = Logger(str(ckp_path), 0, False)
 
     ckp = torch.load(super_path)
@@ -39,9 +39,13 @@ def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
     supernet.load_state_dict(ckp['search_model'])
 
     ckp_names = os.listdir(ckp_path)
+    from datetime import datetime
+    random.seed(datetime.now())
     random.shuffle(ckp_names)
     for ckp_name in ckp_names:
         if 'super' in ckp_name:
+            continue
+        if not os.path.exists(os.path.join(ckp_path, ckp_name)):
             continue
         arch = getvalue(ckp_name, 'arch')
         op_list = get_op_list(int(arch))
@@ -55,7 +59,12 @@ def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
         })
         network = torch.nn.DataParallel(net).cuda()
         valid_losses, valid_acc1s, valid_acc5s, valid_tms = evaluate_all_datasets(network, datasets, xpaths, splits, use_less, workers, logger)
-        old_ckp = torch.load(os.path.join(ckp_path, ckp_name))
+        try:
+            old_ckp = torch.load(os.path.join(ckp_path, ckp_name))
+        except:
+            print(ckp_name)
+            continue
+
         for key in valid_losses:
             old_ckp[key] = valid_losses[key]
         for key in valid_acc1s:
@@ -64,11 +73,13 @@ def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
             old_ckp[key] = valid_acc5s[key]
         for key in valid_tms:
             old_ckp[key] = valid_tms[key]
+
         cf10_super = valid_acc1s['cf10-otest-acc1']
         cf100_super = valid_acc1s['cf100-otest-acc1']
         img_super = valid_acc1s['img-otest-acc1']
-        new_ckp_name = ckp_name[:-4] + f'cf10-super_f{cf10_super}_cf100-super_f{cf100_super}_img-super_f{img_super}' + '.tar'
+        new_ckp_name = ckp_name[:-4] + f'_cf10-super_f{cf10_super}_cf100-super_f{cf100_super}_img-super_f{img_super}' + '.tar'
         torch.save(old_ckp, os.path.join(ckp_path, new_ckp_name))
+        os.remove(os.path.join(ckp_path, ckp_name))
 
 
 
@@ -128,9 +139,6 @@ def evaluate_all_datasets(network, datasets, xpaths, splits, use_less, workers, 
         dataset_key = '{:}'.format(dataset)
         if bool(split): dataset_key = dataset_key + '-valid'
         logger.log('Evaluate ||||||| {:10s} ||||||| Train-Num={:}, Valid-Num={:}, Valid-Loader-Num={:}, batch size={:}'.format(dataset_key, len(train_data), len(valid_data), len(valid_loader), config.batch_size))
-        logger.log('Evaluate ||||||| {:10s} ||||||| Config={:}'.format(dataset_key, config))
-        for key, value in ValLoaders.items():
-          logger.log('Evaluate ---->>>> {:10s} with {:} batchs'.format(key, len(value)))
 
         short = {
             'ImageNet16-120': 'img',
@@ -144,9 +152,10 @@ def evaluate_all_datasets(network, datasets, xpaths, splits, use_less, workers, 
           for key, xloder in ValLoaders.items():
             valid_loss, valid_acc1, valid_acc5, valid_tm = pure_evaluate(xloder, network)
             valid_losses[short[dataset]+'-'+short[key]+'-'+'loss'] = valid_loss
-            valid_acc1s[short[dataset]+'_'+short[key]+'-'+'acc1'] = valid_acc1
-            valid_acc5s[short[dataset]+'_'+short[key]+'-'+'acc5'] = valid_acc5
-            valid_tms[short[dataset]+'_'+short[key]+'-'+'tm'] = valid_tm
+            valid_acc1s[short[dataset]+'-'+short[key]+'-'+'acc1'] = valid_acc1
+            valid_acc5s[short[dataset]+'-'+short[key]+'-'+'acc5'] = valid_acc5
+            valid_tms[short[dataset]+'-'+short[key]+'-'+'tm'] = valid_tm
+            logger.log('Evaluate ---->>>> {:10s} top1: {:}  top5: {:}  loss: {:}'.format(key, valid_acc1, valid_acc5, valid_loss))
       return valid_losses, valid_acc1s, valid_acc5s, valid_tms
 
 if __name__ == '__main__':
@@ -158,7 +167,8 @@ if __name__ == '__main__':
     parser.add_argument('--datasets',    type=str,   nargs='+',      help='The applied datasets.')
     parser.add_argument('--xpaths',      type=str,   nargs='+',      help='The root path for this dataset.')
     parser.add_argument('--splits',      type=int,   nargs='+',      help='The root path for this dataset.')
-    parser.add_argument('--use_less',    type=int,   default=0, choices=[0,1], help='Using the less-training-epoch config.')
+    parser.add_argument('--use_less',    type=int,   default=0,      choices=[0,1], help='Using the less-training-epoch config.')
+    parser.add_argument('--seed',    type=int,   default=0,          help='Using the less-training-epoch config.')
     args = parser.parse_args()
 
     main(args.arch_path, args.ckp_path, args.workers, args.datasets, args.xpaths, args.splits, args.use_less > 0)
