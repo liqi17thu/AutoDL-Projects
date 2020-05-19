@@ -79,3 +79,42 @@ class TinyNetworkRANDOM(nn.Module):
     out = out.view(out.size(0), -1)
     logits = self.classifier(out)
     return out, logits
+
+
+  def extract_sub(self, op_indices):
+    stem = deepcopy(self.stem)
+    cells = nn.ModuleList()
+    for cell in self.cells:
+      if isinstance(cell, SearchCell):
+        cells.append(cell.extract_sub(op_indices))
+      else:
+        cells.append(deepcopy(cell))
+
+    lastact = deepcopy(self.lastact)
+    global_pooling = deepcopy(self.global_pooling)
+    classifier = deepcopy(self.classifier)
+    return SampledRANDOM(
+      stem, cells, lastact, global_pooling, classifier
+    )
+
+
+class SampledRANDOM(nn.Module):
+  def __init__(self, stem, cells, lastact, global_pooling, classifier):
+    super(SampledRANDOM, self).__init__()
+    self.stem = stem
+    self.cells = cells
+    self.lastact = lastact
+    self.global_pooling = global_pooling
+    self.classifier = classifier
+
+  def forward(self, inputs):
+    feature = self.stem(inputs)
+    for i, cell in enumerate(self.cells):
+        feature = cell(feature)
+
+    out = self.lastact(feature)
+    out = self.global_pooling(out)
+    out = out.view(out.size(0), -1)
+    logits = self.classifier(out)
+
+    return out, logits
