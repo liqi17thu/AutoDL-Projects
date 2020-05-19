@@ -146,4 +146,3 @@ class SampledDarts(nn.Module):
 # model = TinyNetworkDarts(16, 5, 4, 10, ['none', 'skip_connect', 'nor_conv_1x1', 'nor_conv_3x3', 'avg_pool_3x3'], False, True)
 #
 # sampled_darts = model.extract_sub(op_indices)
-# print(sampled_darts)
