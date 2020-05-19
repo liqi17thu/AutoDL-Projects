@@ -6,9 +6,9 @@
 import torch
 import torch.nn as nn
 from copy import deepcopy
-from lib.models.cell_operations import ResNetBasicblock
-from lib.models.cell_searchs.search_cells     import NAS201SearchCell as SearchCell
-from lib.models.cell_searchs.genotypes        import Structure
+from models.cell_operations import ResNetBasicblock
+from models.cell_searchs.search_cells     import NAS201SearchCell as SearchCell
+from models.cell_searchs.genotypes        import Structure
 
 
 class TinyNetworkDarts(nn.Module):
@@ -103,7 +103,6 @@ class TinyNetworkDarts(nn.Module):
       if isinstance(cell, SearchCell):
         cells.append(cell.extract_sub(op_indices))
       else:
-        print(cell)
         cells.append(deepcopy(cell))
 
     lastact = deepcopy(self.lastact)

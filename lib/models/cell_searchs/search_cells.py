@@ -6,7 +6,7 @@ import warnings
 import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
-from lib.models.cell_operations import OPS
+from models.cell_operations import OPS
 
 
 # This module is used for NAS-Bench-201, represents a small search space with a complete DAG
