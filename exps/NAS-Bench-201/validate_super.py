@@ -6,10 +6,11 @@ from pathlib import Path
 
 lib_dir = (Path(__file__).parent / '..' / '..' / 'lib').resolve()
 if str(lib_dir) not in sys.path: sys.path.insert(0, str(lib_dir))
+from procedures   import get_optim_scheduler
 from config_utils import load_config
 from datasets     import get_datasets
 from log_utils    import Logger, AverageMeter, time_string, convert_secs2time
-from functions import pure_evaluate
+from functions import pure_evaluate, procedure
 
 def get_op_list(n):
     ops = []
@@ -114,10 +115,12 @@ def evaluate_all_datasets(network, datasets, xpaths, splits, use_less, workers, 
           train_data_v2.transform = valid_data.transform
           valid_data = train_data_v2
           # data loader
+          train_loader = torch.utils.data.DataLoader(train_data, batch_size=config.batch_size, sampler=torch.utils.data.sampler.SubsetRandomSampler(split_info.train), num_workers=workers, pin_memory=True)
           valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=config.batch_size, sampler=torch.utils.data.sampler.SubsetRandomSampler(split_info.valid), num_workers=workers, pin_memory=True)
           ValLoaders['x-valid'] = valid_loader
         else:
           # data loader
+          train_loader = torch.utils.data.DataLoader(train_data, batch_size=config.batch_size, shuffle=True, num_workers=workers, pin_memory=True)
           valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=config.batch_size, shuffle=False, num_workers=workers, pin_memory=True)
           if dataset == 'cifar10':
             ValLoaders = {'ori-test': valid_loader}
@@ -139,6 +142,11 @@ def evaluate_all_datasets(network, datasets, xpaths, splits, use_less, workers, 
         dataset_key = '{:}'.format(dataset)
         if bool(split): dataset_key = dataset_key + '-valid'
         logger.log('Evaluate ||||||| {:10s} ||||||| Train-Num={:}, Valid-Num={:}, Valid-Loader-Num={:}, batch size={:}'.format(dataset_key, len(train_data), len(valid_data), len(valid_loader), config.batch_size))
+
+        optimizer, scheduler, criterion = get_optim_scheduler(network.parameters(), config)
+        for epoch in range(5):  # finetune 5 epochs
+            scheduler.update(epoch, 0.0)
+            procedure(train_loader, network, criterion, scheduler, optimizer, 'train')
 
         short = {
             'ImageNet16-120': 'img',
@@ -167,7 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('--datasets',    type=str,   nargs='+',      help='The applied datasets.')
     parser.add_argument('--xpaths',      type=str,   nargs='+',      help='The root path for this dataset.')
     parser.add_argument('--splits',      type=int,   nargs='+',      help='The root path for this dataset.')
-    parser.add_argument('--use_less',    type=int,   default=0,      choices=[0,1], help='Using the less-training-epoch config.')
+    parser.add_argument('--use_less',    type=int,   default=1,      choices=[0,1], help='Using the less-training-epoch config.')
     parser.add_argument('--seed',    type=int,   default=0,          help='Using the less-training-epoch config.')
     args = parser.parse_args()
 
