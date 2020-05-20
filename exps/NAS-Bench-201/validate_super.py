@@ -76,11 +76,9 @@ def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
             old_ckp[key] = valid_tms[key]
 
         cf10_super = valid_acc1s['cf10-otest-acc1']
-        cf100_super = valid_acc1s['cf100-otest-acc1']
-        img_super = valid_acc1s['img-otest-acc1']
-        new_ckp_name = ckp_name[:-4] + f'_cf10-super_f{cf10_super}_cf100-super_f{cf100_super}_img-super_f{img_super}' + '.tar'
+        new_ckp_name = ckp_name[:-4] + f'_cf10-super_f{cf10_super}' + '.tar'
         torch.save(old_ckp, os.path.join(ckp_path, new_ckp_name))
-        # os.remove(os.path.join(ckp_path, ckp_name))
+        os.remove(os.path.join(ckp_path, ckp_name))
 
 
 

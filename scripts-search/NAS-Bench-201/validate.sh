@@ -14,10 +14,7 @@ ckp_path=$2
 OMP_NUM_THREADS=4 python ./exps/NAS-Bench-201/validate_super.py \
   --arch_path ${arch_path} \
   --ckp_path ${ckp_path} \
-	--datasets cifar10 cifar10 cifar100 ImageNet16-120 \
+	--datasets cifar10 \
 	--splits   1       0       0        0 \
 	--xpaths $TORCH_HOME/cifar.python \
-		 $TORCH_HOME/cifar.python \
-		 $TORCH_HOME/cifar.python \
-		 $TORCH_HOME/cifar.python/ImageNet16 \
 	--workers 8
