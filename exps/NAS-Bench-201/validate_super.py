@@ -28,7 +28,18 @@ def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
     logger = Logger(str(ckp_path), 0, False)
 
     ckp = torch.load(super_path)
-    model_config = dict2config({'name': 'DARTS-V1',
+    from collections import OrderedDict
+    state_dict = OrderedDict()
+    model_name = super_path.split('/')[2][:-8]
+    old_state_dict = ckp['shared_cnn'] if model_name == 'ENAS' else ckp['search_model']
+    for k, v in old_state_dict.items():
+        if 'module' in k:
+            name = k[7:] # remove `module.`
+        else:
+            name = k
+        state_dict[name] = v
+
+    model_config = dict2config({'name': model_name,
                                 'C': 16,
                                 'N': 5,
                                 'max_nodes': 4,
@@ -37,13 +48,16 @@ def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
                                 'affine': False,
                                 'track_running_stats': True}, None)
     supernet = get_cell_based_tiny_net(model_config)
-    supernet.load_state_dict(ckp['search_model'])
+    # supernet.load_state_dict(ckp['search_model'])
+    supernet.load_state_dict(state_dict)
 
     ckp_names = os.listdir(ckp_path)
     from datetime import datetime
     random.seed(datetime.now())
     random.shuffle(ckp_names)
     for ckp_name in ckp_names:
+        if not ckp_name.endswith('.tar'):
+            continue
         if 'super' in ckp_name:
             continue
         if not os.path.exists(os.path.join(ckp_path, ckp_name)):
@@ -74,6 +88,7 @@ def main(super_path, ckp_path, workers, datasets, xpaths, splits, use_less):
             old_ckp[key] = valid_acc5s[key]
         for key in valid_tms:
             old_ckp[key] = valid_tms[key]
+        old_ckp['super'] = network.module.state_dict()
 
         cf10_super = valid_acc1s['cf10-otest-acc1']
         new_ckp_name = ckp_name[:-4] + f'_cf10-super_f{cf10_super}' + '.tar'
@@ -142,7 +157,7 @@ def evaluate_all_datasets(network, datasets, xpaths, splits, use_less, workers, 
         logger.log('Evaluate ||||||| {:10s} ||||||| Train-Num={:}, Valid-Num={:}, Valid-Loader-Num={:}, batch size={:}'.format(dataset_key, len(train_data), len(valid_data), len(valid_loader), config.batch_size))
 
         optimizer, scheduler, criterion = get_optim_scheduler(network.parameters(), config)
-        for epoch in range(5):  # finetune 5 epochs
+        for epoch in range(config.epochs):  # finetune 5 epochs
             scheduler.update(epoch, 0.0)
             procedure(train_loader, network, criterion, scheduler, optimizer, 'train')
 
