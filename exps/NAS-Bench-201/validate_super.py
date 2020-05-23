@@ -15,8 +15,8 @@ from functions import pure_evaluate, procedure
 def get_op_list(n):
     ops = []
     while len(ops) < 6:
-        ops.insert(0, int(n % 5))
-        n /= 5
+        ops.insert(0, int(n % 10))
+        n /= 10
     return ops
 
 def getvalue(item, key):
@@ -192,4 +192,5 @@ if __name__ == '__main__':
     parser.add_argument('--seed',    type=int,   default=0,          help='Using the less-training-epoch config.')
     args = parser.parse_args()
 
+    print(args.datasets)
     main(args.arch_path, args.ckp_path, args.workers, args.datasets, args.xpaths, args.splits, args.use_less > 0)
